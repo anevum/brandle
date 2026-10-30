@@ -16,6 +16,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --check app.mjs && node --check logic.mjs && node --check build-worker.mjs
+      - run: node --test scripts/compare-release-baseline.test.mjs
       - run: node --test release-guard.test.mjs
       - run: node --test tests.mjs
       - run: node build-worker.mjs
