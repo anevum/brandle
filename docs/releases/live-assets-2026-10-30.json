@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-10-30",
+  "kind": "historical-read-only-release-baseline",
+  "source": "Cloudflare Worker script content/v2 decoded embedded BASE64 asset table",
+  "worker": "brandle-glimmer-grove",
+  "workerVersionId": "1c48deb3-6c35-4b9b-9d84-a37d2596ca70",
+  "deploymentId": "86970d97-7975-45e5-a000-0fba9a7379f6",
+  "warning": "Historical snapshot, not a promise this Worker is still deployed or a verified rollback procedure. Keep immutable when source changes; make a new dated baseline for subsequent releases.",
+  "files": {
+    "index.html": {
+      "sha256": "56ede483c4e91c70ffd547d51d09e57ffd4d8b773f611093d92795c96738c5be",
+      "bytes": 6154
+    },
+    "styles.css": {
+      "sha256": "9472b9f5d7a71d207e144e41199d6f5f3e78499872c320fd3c1db6c0bcd03e79",
+      "bytes": 18890
+    },
+    "app.mjs": {
+      "sha256": "feae8d2ae6a105a0e1b3600409bf8fd6cadcaf722d1aff0888f3d150313ffa40",
+      "bytes": 24766
+    },
+    "logic.mjs": {
+      "sha256": "34d2bd2cdc1f77baac41abe93f51e0ac75d77f2723f22ce66c6cda01a6bde125",
+      "bytes": 5370
+    },
+    "words.mjs": {
+      "sha256": "03e1c0368570abacbdb3f3db70f3b3acd6c0665918f604df52efe962bad7293f",
+      "bytes": 93945
+    },
+    "manifest.webmanifest": {
+      "sha256": "742c4c5a6044d8ec496ac7980bc680b947faf0431bf7c1e353f48307b46d999b",
+      "bytes": 697
+    },
+    "icon.svg": {
+      "sha256": "3446cb48dbdeaa1c6a2531a78bf4e5ef7decf779e4be0417158926f77d294d61",
+      "bytes": 1806
+    },
+    "icon-180.png": {
+      "sha256": "2cdc39245255b4d42f4c969376752ca4870270536b676a9d9c5431909a5d06fc",
+      "bytes": 33428
+    },
+    "icon-512.png": {
+      "sha256": "bbc50b6da58309bc54a307a86a9d19ff870f5bd4e986616b62a5e324a04caddc",
+      "bytes": 263524
+    },
+    "og.png": {
+      "sha256": "16acc271177fb8799c108ec7050729b53cf6409ce7918366c56602e3752b3b38",
+      "bytes": 757533
+    },
+    "og.svg": {
+      "sha256": "fc781f736b45e7c4957ea8d4b8dbad7ea12a5413c5bf42578596ec4b48d3e69a",
+      "bytes": 2809
+    },
+    "sw.js": {
+      "sha256": "ec3fc3ddbc96fe7c4748d7db72a359189a01c6e6d40e08c7d86ac96ce9590548",
+      "bytes": 1054
+    }
+  }
+}
