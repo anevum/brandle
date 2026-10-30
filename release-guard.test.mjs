@@ -1,0 +1,20 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+
+const root = process.cwd();
+const activeDir = join(root, '.github', 'workflows');
+const active = readdirSync(activeDir).filter(name => /\.ya?ml$/.test(name));
+assert.deepEqual(active, ['ci.yml'], 'Standalone must have only the CI workflow until approved cutover');
+const ci = readFileSync(join(activeDir, 'ci.yml'), 'utf8');
+assert.match(ci, /permissions:\s*\n\s+contents: read/, 'CI must use read-only permissions');
+assert.doesNotMatch(ci, /\b(?:wrangler\s+(?:deploy|publish|versions\s+deploy)|cloudflare\/workers-action|CLOUDFLARE_API_TOKEN|BRANDLE_CLOUDFLARE_API_TOKEN)\b/i, 'CI cannot deploy');
+const staged = readFileSync(join(root, '.github', 'staged-releases', 'brandle-production.yml'), 'utf8');
+assert.match(staged, /workflow_dispatch:/);
+assert.doesNotMatch(staged, /^\s{2}(?:push|pull_request|schedule|repository_dispatch):/m, 'Staged release must be manual-only');
+assert.match(staged, /github\.repository == 'anevum\/brandle'/);
+assert.match(staged, /BRANDLE_LEGACY_DEPLOY_DISABLED == 'true'/);
+assert.match(staged, /BRANDLE_RELEASE_OWNER == 'standalone'/);
+assert.match(staged, /environment: brandle-production/);
+assert.match(staged, /git merge-base --is-ancestor/);
+console.log('Brandle release guard passed: one CI-only active workflow; staged deployment remains gated and inactive.');
