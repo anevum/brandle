@@ -1,0 +1,87 @@
+name: BRANDLE production release (manual handover only)
+run-name: Brandle release ${{ inputs.approved_sha }}
+
+# INACTIVE TEMPLATE: deliberately stored outside .github/workflows/.
+# Moving it to .github/workflows is a separate reviewed cutover.
+on:
+  workflow_dispatch:
+    inputs:
+      approved_sha:
+        description: 'Reviewed 40-character commit SHA from standalone main'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: brandle-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Repository variables are independent cutover switches; leave unset now.
+    if: >-
+      ${{ github.repository == 'anevum/brandle' && github.ref == 'refs/heads/main' && vars.BRANDLE_RELEASE_OWNER == 'standalone' && vars.BRANDLE_LEGACY_DEPLOY_DISABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: brandle-production
+    steps:
+      - name: Checkout exact approved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.approved_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Ensure SHA is exact and reachable from main
+        shell: bash
+        env:
+          APPROVED_SHA: ${{ inputs.approved_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$APPROVED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$APPROVED_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$APPROVED_SHA" origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify source and built Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.mjs
+          node --check logic.mjs
+          node --check build-worker.mjs
+          node --test tests.mjs
+          node build-worker.mjs
+          node --check dist/worker.mjs
+          node --test worker.test.mjs
+      - name: Refuse a different Cloudflare Worker or runtime entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fx 'name = "brandle-glimmer-grove"' wrangler.toml
+          grep -Fx 'main = "./dist/worker.mjs"' wrangler.toml
+          grep -Fx 'workers_dev = true' wrangler.toml
+          if grep -Eq '^[[:space:]]*(routes?|d1_databases|r2_buckets|kv_namespaces)[[:space:]]*=' wrangler.toml; then
+            echo 'Refusing unexpected route or storage bindings' >&2
+            exit 1
+          fi
+      - name: Deploy only Brandle Worker
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.BRANDLE_CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.BRANDLE_CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx --yes wrangler@4 deploy --config wrangler.toml
+      - name: Read-only public smoke after release
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=https://brandle-glimmer-grove.devonakins.workers.dev
+          for path in / /logic.mjs /app.mjs /sw.js; do
+            curl --fail --silent --show-error --retry 3 --max-time 20 "$base$path" >/dev/null
+          done
