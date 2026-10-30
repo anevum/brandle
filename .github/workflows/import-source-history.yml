@@ -1,0 +1,82 @@
+name: Import preserved Brandle source history
+
+# One-time, non-deploying bootstrap. Imports only the existing public game.
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/import-source-history.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: brandle-source-history-import
+  cancel-in-progress: false
+
+jobs:
+  prepare-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Brandle destination
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch original public source and history
+        uses: actions/checkout@v4
+        with:
+          repository: anevum/anevum-web
+          ref: c81c42683cd397bebb8855f07dd56393a56e124b
+          path: .upstream-source
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Split original Git history and verify game
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .upstream-source/games/brandle/LICENSE
+          test -f .upstream-source/games/brandle/NOTICE.md
+          test -f .upstream-source/games/brandle/.github/workflows/ci.yml
+          split_sha="$(git -C .upstream-source subtree split --prefix=games/brandle HEAD)"
+          test -n "$split_sha"
+          git fetch .upstream-source "$split_sha"
+          git worktree add --detach "$RUNNER_TEMP/brandle-source-check" "$split_sha"
+          cd "$RUNNER_TEMP/brandle-source-check"
+          test -f LICENSE && test -f NOTICE.md
+          test -f README.md && test -f .github/workflows/ci.yml
+          test ! -e apps && test ! -e games
+          node --check app.mjs
+          node --check logic.mjs
+          node --test tests.mjs
+          node build-worker.mjs
+          node --check dist/worker.mjs
+          echo "BRANDLE source and tests verified: $split_sha"
+
+      - name: Prepare non-destructive migration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code origin refs/heads/migration/brandle-source >/dev/null 2>&1; then
+            echo "::error::Migration branch already exists; refusing to overwrite"
+            exit 1
+          fi
+          split_sha="$(git rev-parse FETCH_HEAD)"
+          main_sha="$(git rev-parse refs/heads/main)"
+          test -n "$main_sha" && test -n "$split_sha"
+          tree_sha="$(git rev-parse "$split_sha^{tree}")"
+          merge_sha="$(printf '%s\n' \
+            'Import Brandle standalone source with original history' \
+            '' \
+            'First parent: GitHub-created initial README.' \
+            'Second parent: exact subtree history from anevum/anevum-web.' \
+            'No live Cloudflare deployment was modified.' | \
+            git -c user.name='ANEVUM Repository Migration' \
+                -c user.email='devon@anevum.com' \
+                commit-tree "$tree_sha" -p "$main_sha" -p "$split_sha")"
+          git update-ref refs/heads/migration/brandle-source "$merge_sha"
+          git push origin refs/heads/migration/brandle-source
+          echo "Prepared preserved-history migration branch: $merge_sha"
+          echo "A reviewed PR is required before merging into main."
