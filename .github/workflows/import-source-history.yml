@@ -55,7 +55,7 @@ jobs:
           node --check dist/worker.mjs
           echo "BRANDLE source and tests verified: $split_sha"
 
-      - name: Prepare non-destructive migration branch
+      - name: Prepare branch with preserved game history and unchanged workflows
         shell: bash
         run: |
           set -euo pipefail
@@ -63,20 +63,52 @@ jobs:
             echo "::error::Migration branch already exists; refusing to overwrite"
             exit 1
           fi
-          split_sha="$(git rev-parse FETCH_HEAD)"
           main_sha="$(git rev-parse refs/heads/main)"
-          test -n "$main_sha" && test -n "$split_sha"
-          tree_sha="$(git rev-parse "$split_sha^{tree}")"
+          # The previous step checked out the original isolated project history.
+          source_sha="$(git -C "$RUNNER_TEMP/brandle-source-check" rev-parse HEAD)"
+          test -n "$main_sha" && test -n "$source_sha"
+
+          # GitHub Actions' token may write code, but cannot push commits that
+          # introduce workflow files. Exclude only historical workflow entries,
+          # retaining the original project commit messages and parent lineage.
+          # The source of record and exact history remain in anevum-web.
+          git init --initial-branch=main "$RUNNER_TEMP/brandle-history-safe"
+          git -C "$RUNNER_TEMP/brandle-history-safe" fetch "$GITHUB_WORKSPACE" "$source_sha"
+          git -C "$RUNNER_TEMP/brandle-history-safe" reset --hard FETCH_HEAD
+          FILTER_BRANCH_SQUELCH_WARNING=1 git -C "$RUNNER_TEMP/brandle-history-safe" \
+            filter-branch --force --index-filter \
+            'git rm --cached -r -q --ignore-unmatch .github/workflows' \
+            --prune-empty -- main
+          filtered_sha="$(git -C "$RUNNER_TEMP/brandle-history-safe" rev-parse main)"
+          if git -C "$RUNNER_TEMP/brandle-history-safe" rev-list --objects main |
+               grep -Eq ' \.github/workflows/'; then
+            echo "::error::Workflow file still reachable in migration history"
+            exit 1
+          fi
+
+          git fetch "$RUNNER_TEMP/brandle-history-safe" "$filtered_sha"
+          # Final tree combines Brandle's standalone source with the existing
+          # bootstrap workflow, so the push changes NO workflow paths.
+          git read-tree "$filtered_sha"
+          git restore --source="$main_sha" --staged -- \
+            .github/workflows/import-source-history.yml
+          if test -n "$(git diff --cached --name-only "$main_sha" -- .github/workflows/)"; then
+            echo "::error::Migration unexpectedly changes existing workflow paths"
+            exit 1
+          fi
+          tree_sha="$(git write-tree)"
           merge_sha="$(printf '%s\n' \
-            'Import Brandle standalone source with original history' \
+            'Import Brandle standalone project source and commit history' \
             '' \
-            'First parent: GitHub-created initial README.' \
-            'Second parent: exact subtree history from anevum/anevum-web.' \
-            'No live Cloudflare deployment was modified.' | \
+            'First parent: existing GitHub README and migration workflow.' \
+            'Second parent: original Brandle project history with CI-only' \
+            'workflow entries removed for GitHub Actions token restrictions.' \
+            'Original, unmodified source remains in anevum/anevum-web.' \
+            'CI will be installed separately after source review.' | \
             git -c user.name='ANEVUM Repository Migration' \
                 -c user.email='devon@anevum.com' \
-                commit-tree "$tree_sha" -p "$main_sha" -p "$split_sha")"
+                commit-tree "$tree_sha" -p "$main_sha" -p "$filtered_sha")"
           git update-ref refs/heads/migration/brandle-source "$merge_sha"
           git push origin refs/heads/migration/brandle-source
-          echo "Prepared preserved-history migration branch: $merge_sha"
-          echo "A reviewed PR is required before merging into main."
+          echo "Prepared scoped-history migration branch: $merge_sha"
+          echo "Production and database settings are unchanged."
