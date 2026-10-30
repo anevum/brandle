@@ -19,5 +19,6 @@ jobs:
       - run: node --test tests.mjs
       - run: node build-worker.mjs
       - run: node --check dist/worker.mjs
+      - run: node --test worker.test.mjs
 # CI ONLY: production Brandle Worker remains deployed from the original repository
 # until the new repository, credentials, release and rollback have been verified.
