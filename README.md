@@ -11,6 +11,7 @@ From this project directory (either `games/brandle` in the original monorepo or 
 ```sh
 node --test tests.mjs
 node build-worker.mjs
+node --test worker.test.mjs
 # Production deployment is managed separately until repository cutover.
 ```
 
@@ -39,4 +40,4 @@ The production Worker must bundle assets using `node build-worker.mjs` before de
 
 ## Standalone repository migration
 
-The intended standalone repository is `anevum/brandle`. Extract the project with the history-preserving tool documented in `docs/REPOSITORY_ARCHITECTURE.md` at the source repository root; audit the full exported history before publishing. The original game deployment remains authoritative until a tested, rollback-ready cutover. No deployment secrets, game progress or personal data should be committed.
+This repository contains the imported Brandle source and project-specific development lineage. The original history remains available in `anevum/anevum-web`; see [source migration PR #1](https://github.com/anevum/brandle/pull/1). The original game deployment remains authoritative until a tested, rollback-ready cutover. No deployment secrets, game progress or personal data should be committed.
