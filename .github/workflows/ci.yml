@@ -12,9 +12,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: python3 -m unittest scripts/test_scan_git_history.py
+      - run: python3 scripts/scan-git-history.py
       - run: node --check app.mjs && node --check logic.mjs && node --check build-worker.mjs
       - run: node --test scripts/compare-release-baseline.test.mjs
       - run: node --test release-guard.test.mjs
